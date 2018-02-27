@@ -1,6 +1,6 @@
 {
   "name": "sat-api",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "One API to search public Satellite metadata using AWS' APIGateway",
   "author": "Development Seed",
   "license": "MIT",
