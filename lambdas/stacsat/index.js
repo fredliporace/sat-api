@@ -39,7 +39,6 @@ async function handler (event, context=null, cb=function(){}) {
   //var _transform = through2({'objectMode': true, 'consume': true}, transform)
 
   //const bucket = _.get(event, 'bucket')
-  //const key = _.get(event, 'key')
   //const arn = _.get(event, 'arn', null)
   //const retries = _.get(event, 'retries', 0)
 
@@ -52,29 +51,41 @@ async function handler (event, context=null, cb=function(){}) {
   console.log(imported_stac_item.geometry.coordinates[0][0][1][0])
   console.log(imported_stac_item.geometry.coordinates[0][0][1][1])
   
-  // load collection from stac item
-  // @todo load this only if necessary
-  const imported_collection = JSON.parse(await download_json(imported_stac_item.links.collection.href))
-  console.log(imported_collection)
-  console.log(imported_collection.properties['c:id'])
-  
   // add collection
   // satlib.es.client is an async function
-  satlib.es.client().then((client) => {
+  satlib.es.client().then(async (client) => {
     console.log('Connected to ES')
 
     // Create a 'collection' index in ES
     satlib.es.putMapping(client, 'collections').catch((err) => {})
 
-    // @todo is this saving the collection multiple times?
-    // @todo should be: check if collection id is already inserted, if
-    // not download collection from STAC link and insert it.
-    // @todo repeating c:id parameter at first level, check 'c:id' passed to saveRecords below
-    imported_collection['c:id'] = imported_collection.properties['c:id']
-    // @todo check, had to remove index= named parameter
-    satlib.es.saveRecords(client, [imported_collection], 'collections', 'c:id', (err, updated, errors) => {
-      if (err) console.log('Error: ', err)
+    // Check if we need to import collection
+    const collection_exists = await client.exists({
+      index: 'collections',
+      type: 'doc',
+      id: imported_stac_item.properties['c:id']
     })
+    if( !collection_exists ) {
+      // Read collection information and insert into ES
+      console.log('Collection ', imported_stac_item.properties['c:id'],
+                  'does not exist, importing')
+      // Load collection from stac item
+      const imported_collection = JSON.parse(await download_json(imported_stac_item.links.collection.href))
+      console.log(imported_collection)
+      console.log(imported_collection.properties['c:id'])
+
+      // @todo repeating c:id parameter at first level, check 'c:id' passed to saveRecords below
+      imported_collection['c:id'] = imported_collection.properties['c:id']
+
+      // @todo check, had to remove index= named parameter
+      satlib.es.saveRecords(client, [imported_collection], 'collections', 'c:id',
+                            (err, updated, errors) => {
+        if (err) console.log('Error: ', err)
+      })
+    } else {
+      console.log('Collection', imported_stac_item.properties['c:id'],
+                  'already imported');
+    }
 
     // @todo here I should have a single stac item processing. Maybe
     // it is a good idea to process batches
@@ -101,8 +112,7 @@ local.localRun(() => {
   // test payload
   const a = {
     bucket: 'sat-api',
-    key: 'testing/landsat',
-    stac_item_url: 'https://s3.amazonaws.com/cbers-stac/CBERS4/MUX/078/086/CBERS_4_MUX_20180702_078_086_L2.json'
+    stac_item_url: 'https://s3.amazonaws.com/cbers-stac/CBERS4/MUX/057/111/CBERS_4_MUX_20180713_057_111_L2.json'
   }
 
   handler(a, null, (err, r) => {                            
