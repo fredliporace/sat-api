@@ -1,22 +1,9 @@
 
 'use strict'
 
-//const got = require('got')
-//const path = require('path')
-//const moment = require('moment')
-//const pad = require('lodash.padstart')
-const _ = require('lodash')
-//const AWS = require('aws-sdk')
 const local = require('kes/src/local')
 const satlib = require('sat-api-lib')
-
-// Wrapper around streams.Transform
-// const through2 = require('through2')
-
 const request = require('request')
-
-// s3 client
-//const s3 = new AWS.S3()
 
 function download_json(url) {
   return new Promise((resolve, reject) => {
@@ -30,8 +17,7 @@ function download_json(url) {
   })
 }
 
-// @todo check async 
-async function handler (event, context=null, cb=function(){}) {
+function handler (event, context=null, cb=function(){}) {
 
   //console.log(JSON.stringify(event))
 
@@ -51,7 +37,7 @@ async function handler (event, context=null, cb=function(){}) {
 
   })
 
-  satlib.es.client().then(async (client) => {
+  satlib.es.client().then((client) => {
 
     console.log('Connected to ES')
 
@@ -60,41 +46,38 @@ async function handler (event, context=null, cb=function(){}) {
 
     // traverse list and add collection if necessary
     // satlib.es.client is an async function
-    imported_stac_items.forEach(async function(imported_stac_item) {
+    imported_stac_items.forEach(function(imported_stac_item) {
       // Check if we need to import collection
-      const collection_exists = await client.exists({
+      console.log("Checking ", imported_stac_item.properties['c:id'])
+      client.exists({
         index: 'collections',
         type: 'doc',
         id: imported_stac_item.properties['c:id']
+      }).then(function (collection_exists) {
+        if( !collection_exists ) {
+          // Read collection information and insert into ES
+          // Load collection from stac item
+          download_json(imported_stac_item.links.collection.href).then(function (body) {
+            const imported_collection = JSON.parse(body)
+            console.log(imported_collection)
+            console.log(imported_collection.properties['c:id'])
+        
+            // @todo repeating c:id parameter at first level, check 'c:id' passed
+            // to saveRecords below
+            imported_collection['c:id'] = imported_collection.properties['c:id']
+          
+            // @todo check, had to remove index= named parameter
+            satlib.es.saveRecords(client, [imported_collection], 'collections', 'c:id',
+                                  (err, updated, errors) => {
+                                    if (err) console.log('Error: ', err)
+                                  })
+          })
+        } else {
+          console.log('Collection', imported_stac_item.properties['c:id'],
+                      'already imported');
+        }
       })
-      
-      if( !collection_exists ) {
-        // Read collection information and insert into ES
-        console.log('Collection ', imported_stac_item.properties['c:id'],
-                    'does not exist, importing')
-        // Load collection from stac item
-        const imported_collection = JSON.parse(await download_json(imported_stac_item.links.collection.href))
-        console.log(imported_collection)
-        console.log(imported_collection.properties['c:id'])
-        
-        // @todo repeating c:id parameter at first level, check 'c:id' passed to saveRecords below
-        imported_collection['c:id'] = imported_collection.properties['c:id']
-        
-        // @todo check, had to remove index= named parameter
-        satlib.es.saveRecords(client, [imported_collection], 'collections', 'c:id',
-                              (err, updated, errors) => {
-                                if (err) console.log('Error: ', err)
-                              })
-      } else {
-        console.log('Collection', imported_stac_item.properties['c:id'],
-                    'already imported');
-      }
     })
-
-    // Create a 'items' index in ES and include a batch of STAC items
-    // @todo check error for first call, when there are no indices in ES
-    satlib.es.putMapping(client, 'items').catch((err) => {})
-
     // Include all STAC items
     satlib.es.saveRecords(client, imported_stac_items, 'items', 'id', (err, updated, errors) => {
       if (err) console.log('Error: ', err)
