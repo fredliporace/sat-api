@@ -81,6 +81,13 @@ Resources:
                 - es:*
                 Resource:
                 - "arn:aws:es:*:*:domain/*"
+
+              # Allow access to SQS
+              - Effect: Allow
+                Action:
+                - sqs:*
+                Resource: arn:aws:sqs:*:*:*
+
   StepsRole:
     Type: "AWS::IAM::Role"
     Properties:
@@ -433,7 +440,7 @@ Resources:
       Runtime: {{# if runtime}}{{runtime}}{{else}}nodejs8.10{{/if}}
       Timeout: {{timeout}}
       Tags:
-        - Key: StackName 
+        - Key: StackName
           Value: {{../stackName}}
       {{#each ../tags}}
         - Key: {{@key}}
@@ -455,6 +462,21 @@ Resources:
 {{/each}}
   #################################################
   # Lambda config END
+  #################################################
+
+  #################################################
+  # STAC SNS Feed START
+  #################################################
+{{#each stacsnsfeed}}
+  {{name}}Queue:
+    Type: AWS::SQS::Queue
+    Properties:
+      MessageRetentionPeriod: {{MessageRetentionPeriod}}
+      QueueName: {{../stackName}}-{{name}}
+
+{{/each}}
+  #################################################
+  # STAC SNS Feed END
   #################################################
 
 Outputs:
