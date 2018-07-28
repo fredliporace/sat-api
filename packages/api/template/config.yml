@@ -23,6 +23,8 @@ default:
     cbersfeed:
       name: CBERS
       topic: arn:aws:sns:us-east-1:769537946825:cbers-2-stac-CBERSSTACItemTopic-N0MZUA5EIQC9
+      # Retention period for messages in SQS that will receive
+      # the feed's STAC items
       MessageRetentionPeriod: 1209600
 
   lambdas:

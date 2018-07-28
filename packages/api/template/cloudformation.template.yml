@@ -474,7 +474,56 @@ Resources:
       MessageRetentionPeriod: {{MessageRetentionPeriod}}
       QueueName: {{../stackName}}-{{name}}
 
+  {{name}}QueuePolicy:
+    Type: AWS::SQS::QueuePolicy
+    Properties:
+      PolicyDocument:
+  #        !Sub |
+        Fn::Sub:
+          - |
+            {
+            "Version": "2012-10-17",
+            "Id": "${id}",
+            "Statement": [{
+              "Sid": "${sid}",
+              "Effect": "Allow",
+              "Principal": {
+                "AWS": "*"
+              },
+              "Action": "SQS:SendMessage",
+              "Resource": "${queueArn}",
+              "Condition": {
+                "ArnEquals": {
+                  "aws:SourceArn": "{{topic}}"
+                }
+              }
+              }]
+            }
+          - { queueArn: !GetAtt [{{name}}Queue, Arn], id: {{name}}QueuePolicyId, sid: {{name}}QueuePolicySId }
+      Queues:
+        - !Ref {{name}}Queue
+
+#            Fn::Sub:
+#              - |
+#                {
+#                  "satellite": "landsat",
+#                  "arn": "${stateMachineArn}",
+#                  "maxFiles": 8,
+#                  "maxLambdas": 10,
+#                  "linesPerFile": 300
+#                }
+#              - stateMachineArn: !Ref LandsatMetadataProcessorStateMachine
+
+  {{name}}Subscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      Endpoint: !GetAtt [{{name}}Queue, Arn]
+      Protocol: sqs
+      TopicArn: {{topic}}
+
 {{/each}}
+
+
   #################################################
   # STAC SNS Feed END
   #################################################
