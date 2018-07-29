@@ -478,7 +478,6 @@ Resources:
     Type: AWS::SQS::QueuePolicy
     Properties:
       PolicyDocument:
-  #        !Sub |
         Fn::Sub:
           - |
             {
@@ -503,23 +502,19 @@ Resources:
       Queues:
         - !Ref {{name}}Queue
 
-#            Fn::Sub:
-#              - |
-#                {
-#                  "satellite": "landsat",
-#                  "arn": "${stateMachineArn}",
-#                  "maxFiles": 8,
-#                  "maxLambdas": 10,
-#                  "linesPerFile": 300
-#                }
-#              - stateMachineArn: !Ref LandsatMetadataProcessorStateMachine
-
   {{name}}Subscription:
     Type: AWS::SNS::Subscription
     Properties:
       Endpoint: !GetAtt [{{name}}Queue, Arn]
       Protocol: sqs
       TopicArn: {{topic}}
+
+  {{name}}QueueLambdaTrigger:
+    Type: AWS::Lambda::EventSourceMapping
+    Properties:
+      BatchSize: {{BatchSize}}
+      EventSourceArn: !GetAtt [{{name}}Queue, Arn]
+      FunctionName: !Ref snsingestLambdaFunction
 
 {{/each}}
 

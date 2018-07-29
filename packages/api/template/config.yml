@@ -26,6 +26,9 @@ default:
       # Retention period for messages in SQS that will receive
       # the feed's STAC items
       MessageRetentionPeriod: 1209600
+      # Number of messages (items) processed at each
+      # lambda call
+      BatchSize: 10
 
   lambdas:
     landsat:
